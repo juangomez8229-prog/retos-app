@@ -54,22 +54,26 @@ export default function Dashboard() {
             ? <img src={profile.avatar_url} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="avatar" />
             : (profile?.full_name?.[0] || '?').toUpperCase()}
         </div>
-        <div>
+        <div style={{ flex:1 }}>
           <div style={{ fontSize:'20px', fontWeight:800, color:'#f0f0f5' }}>{profile?.full_name}</div>
           <div style={{ fontSize:'13px', color:'#5a5a72' }}>@{profile?.username}</div>
           <div style={{ fontSize:'11px', color:'#ff4d00', marginTop:'4px', fontWeight:600 }}>🔥 Listo para competir</div>
         </div>
+        <button onClick={() => router.push('/perfil')}
+          style={{ background:'#18181f', border:'1px solid #25252f', color:'#5a5a72', padding:'8px 12px', borderRadius:'8px', cursor:'pointer', fontSize:'12px', fontWeight:600, flexShrink:0 }}>
+          ✏️ Editar
+        </button>
       </div>
 
       <div style={{ marginBottom:'12px', fontSize:'11px', color:'#5a5a72', fontWeight:700, letterSpacing:'2px' }}>MENÚ PRINCIPAL</div>
 
       {menuItems.map((item) => (
         <div key={item.path} onClick={() => router.push(item.path)}
-          style={{ background:'#111116', border:'1px solid #25252f', borderRadius:'16px', padding:'18px 20px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'16px', cursor:'pointer', transition:'all 0.2s' }}
+          style={{ background:'#111116', border:'1px solid #25252f', borderRadius:'16px', padding:'18px 20px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'16px', cursor:'pointer' }}
           onMouseOver={e => (e.currentTarget.style.borderColor = item.color)}
           onMouseOut={e => (e.currentTarget.style.borderColor = '#25252f')}
         >
-          <div style={{ width:'48px', height:'48px', borderRadius:'12px', background:`rgba(255,77,0,0.1)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'24px', flexShrink:0 }}>
+          <div style={{ width:'48px', height:'48px', borderRadius:'12px', background:'rgba(255,77,0,0.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'24px', flexShrink:0 }}>
             {item.icon}
           </div>
           <div style={{ flex:1 }}>
