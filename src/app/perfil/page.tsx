@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 export default function PerfilPage() {
   const [profile, setProfile] = useState<any>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
   const [bio, setBio] = useState('')
@@ -20,21 +21,36 @@ export default function PerfilPage() {
   useEffect(() => {
     const load = async () => {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        router.push('/login')
+        return
+      }
+      
+      setUserId(user.id)
+      
+      const { data, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
       if (data) {
         setProfile(data)
         setFullName(data.full_name || '')
         setUsername(data.username || '')
         setBio(data.bio || '')
-        setWeightKg(data.weight_kg || '')
-        setHeightCm(data.height_cm || '')
+        setWeightKg(data.weight_kg?.toString() || '')
+        setHeightCm(data.height_cm?.toString() || '')
         setAvatarPreview(data.avatar_url || '')
+      } else {
+        setFullName(user.user_metadata?.full_name || '')
+        setUsername(user.user_metadata?.username || '')
       }
     }
     load()
-  }, [])
+  }, [router])
 
   const handleAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -44,19 +60,33 @@ export default function PerfilPage() {
   }
 
   const guardar = async () => {
-    if (!fullName || !username) { setError('Nombre y usuario son obligatorios'); return }
+    if (!fullName.trim() || !username.trim()) {
+      setError('Nombre y usuario son obligatorios')
+      return
+    }
+    if (!userId) {
+      setError('Error de sesión. Por favor recarga la página.')
+      return
+    }
+
     setSaving(true)
     setError('')
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     let avatarUrl = profile?.avatar_url || null
 
     if (avatarFile) {
       const ext = avatarFile.name.split('.').pop()
-      const path = `${user.id}/avatar.${ext}`
-      await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true })
+      const path = `${userId}/avatar.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, avatarFile, { upsert: true })
+      
+      if (uploadError) {
+        setError('Error subiendo foto: ' + uploadError.message)
+        setSaving(false)
+        return
+      }
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
       avatarUrl = urlData.publicUrl
     }
@@ -64,15 +94,15 @@ export default function PerfilPage() {
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
-        full_name: fullName,
-        username: username,
-        bio: bio || null,
+        full_name: fullName.trim(),
+        username: username.trim(),
+        bio: bio.trim() || null,
         weight_kg: weightKg ? parseFloat(weightKg) : null,
         height_cm: heightCm ? parseFloat(heightCm) : null,
         avatar_url: avatarUrl,
         updated_at: new Date().toISOString()
       })
-      .eq('id', user.id)
+      .eq('id', userId)
 
     if (updateError) {
       setError('Error al guardar: ' + updateError.message)
@@ -83,11 +113,11 @@ export default function PerfilPage() {
     setSaving(false)
   }
 
-  const inp = { width:'100%', background:'#18181f', border:'1px solid #25252f', borderRadius:'10px', padding:'12px', color:'#f0f0f5', fontSize:'14px', outline:'none', fontFamily:'sans-serif' }
+  const inp = { width:'100%', background:'#18181f', border:'1px solid #25252f', borderRadius:'10px', padding:'12px', color:'#f0f0f5', fontSize:'14px', outline:'none', fontFamily:'sans-serif', boxSizing:'border-box' as const }
 
-  if (!profile) return (
+  if (!userId) return (
     <div style={{ minHeight:'100vh', background:'#080c10', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff4d00', fontSize:'18px', fontWeight:700 }}>
-      Cargando...
+      ⚡ Cargando...
     </div>
   )
 
@@ -108,8 +138,6 @@ export default function PerfilPage() {
       <div style={{ fontSize:'20px', fontWeight:800, color:'#f0f0f5', marginBottom:'20px' }}>✏️ Editar Perfil</div>
 
       <div style={{ background:'#111116', border:'1px solid #25252f', borderRadius:'16px', padding:'20px' }}>
-
-        {/* FOTO */}
         <div style={{ textAlign:'center', marginBottom:'20px' }}>
           <label style={{ cursor:'pointer' }}>
             <div style={{ width:'90px', height:'90px', borderRadius:'50%', margin:'0 auto 8px', background:'linear-gradient(135deg,#ff4d00,#ff8c00)', border:'3px solid #ff4d00', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'28px', fontWeight:900, color:'#fff', overflow:'hidden' }}>
@@ -117,14 +145,14 @@ export default function PerfilPage() {
                 ? <img src={avatarPreview} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="avatar" />
                 : fullName?.[0]?.toUpperCase() || '?'}
             </div>
-            <div style={{ fontSize:'12px', color:'#ff4d00', fontWeight:600 }}>Cambiar foto</div>
+            <div style={{ fontSize:'12px', color:'#ff4d00', fontWeight:600 }}>📷 Cambiar foto</div>
             <input type="file" accept="image/*" onChange={handleAvatar} style={{ display:'none' }} />
           </label>
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'14px' }}>
           <div>
-            <div style={{ fontSize:'10px', color:'#5a5a72', fontWeight:700, letterSpacing:'1px', marginBottom:'6px' }}>NOMBRE COMPLETO *</div>
+            <div style={{ fontSize:'10px', color:'#5a5a72', fontWeight:700, letterSpacing:'1px', marginBottom:'6px' }}>NOMBRE *</div>
             <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Juan García" style={inp} />
           </div>
           <div>
@@ -135,7 +163,8 @@ export default function PerfilPage() {
 
         <div style={{ marginBottom:'14px' }}>
           <div style={{ fontSize:'10px', color:'#5a5a72', fontWeight:700, letterSpacing:'1px', marginBottom:'6px' }}>BIO</div>
-          <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Cuéntanos sobre ti..." style={{...inp, minHeight:'70px', resize:'none'}} />
+          <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Cuéntanos sobre ti..."
+            style={{ ...inp, minHeight:'70px', resize:'none' }} />
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'20px' }}>
